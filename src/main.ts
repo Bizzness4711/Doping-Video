@@ -372,5 +372,8 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* Başlat */
-renderFilters();
-renderGrid();
+document.addEventListener("DOMContentLoaded",) => {renderFilters;
+                                                   renderGrid;
+  renderFilters();
+  renderGrid();
+});
