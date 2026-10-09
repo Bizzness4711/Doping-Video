@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+/*
+  Marka kimliği — "Sinema Koleksiyonu"
+  Ana renk : Koyu yeşil (film arşivi / projeksiyon odası hissi)
+  Nötr     : Sıcak kağıt beyazı (film programı kâğıdı)
+  Vurgu    : Hardal/amber (projeksiyon ışığı)
+  Mor-mavi degrade YOK — düz, tek tonlu renkler.
+*/
+@theme {
+  --color-ink: #16261f; /* ana koyu yeşil — arka plan & metin */
+  --color-ink-2: #1e332a; /* bir ton açık yeşil — kart yüzeyi */
+  --color-paper: #f4efe4; /* sıcak kağıt — ana metin */
+  --color-paper-dim: #cfc8b8; /* ikincil metin, %70 kontrast hedefi */
+  --color-amber: #e8b341; /* vurgu — projeksiyon ışığı */
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Seçili metin de marka renginden türesin */
+::selection {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+/* Odak halkası erişilebilirlik: klavye kullanıcısı için amber */
+:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+}
