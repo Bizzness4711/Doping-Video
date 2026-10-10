@@ -3,7 +3,7 @@ import "./style.css";
 /* ---------------------------------------------------------------
    İçerik: Blender Vakfı'nın açık lisanslı kısa filmleri.
    Gerçek filmler, gerçek yönetmenler — uydurma veri yok.
-   Videolar doğrudan blender.org / gtv-videos-bucket'tan akar.
+   Videolar doğrudan gtv-videos-bucket'tan akar.
 ---------------------------------------------------------------- */
 
 type Film = {
@@ -15,8 +15,6 @@ type Film = {
   synopsis: string;
   video: string;
   poster: string;
-  /** Kırık simetri: 2 kart büyük, diğerleri normal akışta */
-  featured?: boolean;
 };
 
 const FILMS: Film[] = [
@@ -32,7 +30,6 @@ const FILMS: Film[] = [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
     poster:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg",
-    featured: true,
   },
   {
     title: "Tears of Steel",
@@ -46,7 +43,6 @@ const FILMS: Film[] = [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
     poster:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/TearsOfSteel.jpg",
-    featured: true,
   },
   {
     title: "Big Buck Bunny",
@@ -139,239 +135,276 @@ const CATEGORIES = [
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 /* ---------------------------------------------------------------
-   İşaretleme: hero → filtre → kırık simetri grid → modal
+   Yerleşim (eskizdeki gibi):
+   sol = klasör + video seçim paneli
+   orta = büyük video
+   sağ/sol = mini önizleme çerçeveleri + yön tuşları (< >)
 ---------------------------------------------------------------- */
 
 app.innerHTML = `
-  <!-- ÜST ŞERİT: marka + saat -->
-  <header class="mx-auto flex max-w-6xl items-center justify-between px-6 pt-8">
+  <header class="mx-auto flex max-w-7xl items-center justify-between px-4 pt-6 md:px-6">
     <p class="font-display text-lg font-semibold tracking-tight">
       Sinema<span class="text-amber">Koleksiyonu</span>
     </p>
-    <p class="text-xs uppercase tracking-[0.2em] text-paper-dim">
-      Küratörlü arşiv · ${FILMS.length} film
-    </p>
+    <p id="video-count" class="text-xs uppercase tracking-[0.2em] text-paper-dim"></p>
   </header>
 
-  <!-- HERO: kırık simetri — sol blok geniş, sağ blok dar ve kaydırılmış -->
-  <section class="mx-auto grid max-w-6xl gap-8 px-6 pb-16 pt-16 md:grid-cols-12 md:pb-24 md:pt-24">
-    <div class="md:col-span-7">
-      <h1 class="font-display text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
-        Arşivden
-        <br />
-        <span class="text-amber italic">seçki</span>
-      </h1>
-    </div>
-    <div class="self-end md:col-span-4 md:col-start-9">
-      <p class="text-base leading-relaxed text-paper-dim">
-        Yönetmen, tür ve yıl bazında elden geçirilmiş kısa film
-        arşivi. Her kayıt bir projeksiyon notuyla eşleşir —
-        arşiv, sıralamadan değil kürasyondan oluşur.
-      </p>
-    </div>
-  </section>
+  <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 md:px-6 lg:flex-row">
+    <!-- SOL PANEL: klasör + video seçimi -->
+    <aside class="w-full shrink-0 rounded-lg border border-ink-2 bg-ink-2/60 lg:w-72" aria-label="Klasör ve video seçimi">
+      <div class="border-b border-ink-2 p-4">
+        <h2 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-paper-dim">Klasörler</h2>
+        <div id="folder-list" class="mt-3 flex flex-row gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"></div>
+      </div>
+      <div class="p-4">
+        <h2 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-paper-dim">Videolar</h2>
+        <div id="video-list" class="mt-3 flex flex-row gap-2 overflow-x-auto lg:flex-col lg:overflow-visible" role="listbox" aria-label="Video listesi"></div>
+      </div>
+    </aside>
 
-  <!-- FİLTRE: sol hizalı çip çubuğu -->
-  <nav
-    aria-label="Tür filtresi"
-    class="sticky top-0 z-30 border-b border-ink-2 bg-ink/90 backdrop-blur-sm"
-  >
-    <div id="filters" class="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-6 py-3"></div>
-  </nav>
+    <!-- ORTA SAHNE -->
+    <main class="min-w-0 flex-1">
+      <div class="flex items-center justify-center gap-2 sm:gap-4">
+        <!-- Sol yön + sol mini önizleme -->
+        <button id="prev-btn" type="button" aria-label="Önceki video"
+          class="shrink-0 rounded-full p-2 text-3xl leading-none text-paper-dim transition-colors hover:text-amber sm:p-3">‹</button>
 
-  <!-- GRID: featured kartlar 2 kolon kaplar, sıralama kırılır -->
-  <main
-    id="grid"
-    class="mx-auto grid max-w-6xl auto-rows-auto grid-cols-1 gap-6 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3"
-  ></main>
+        <button id="prev-preview" type="button"
+          class="group hidden w-32 shrink-0 overflow-hidden rounded-lg border border-ink-2 bg-ink-2 text-left transition-colors hover:border-amber/60 sm:block md:w-40"
+          aria-label="Önceki videoya git">
+          <span class="relative block aspect-[4/3] overflow-hidden">
+            <video id="prev-video" class="h-full w-full object-cover" muted playsinline preload="metadata"></video>
+            <span class="absolute inset-0 flex items-center justify-center bg-ink/30">
+              <span class="flex h-9 w-9 items-center justify-center rounded-full border border-paper/60 bg-ink/70 text-sm text-paper">▶</span>
+            </span>
+          </span>
+          <span id="prev-title" class="block truncate px-2 py-1.5 text-xs text-paper-dim"></span>
+        </button>
 
-  <!-- FOOTER -->
-  <footer class="border-t border-ink-2">
-    <div class="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-8 text-xs text-paper-dim sm:flex-row sm:items-center sm:justify-between">
-      <p>© 2026 Sinema Koleksiyonu — tüm filmler açık lisanslıdır.</p>
-      <p>Projeksiyon notları arşivle birlikte gelir.</p>
-    </div>
-  </footer>
-
-  <!-- MODAL -->
-  <div
-    id="modal"
-    class="fixed inset-0 z-50 hidden items-center justify-center bg-ink/95 p-4 sm:p-8"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Video oynatıcı"
-  >
-    <div class="w-full max-w-4xl">
-      <div class="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 id="modal-title" class="font-display text-2xl font-semibold"></h2>
-          <p id="modal-meta" class="mt-1 text-sm text-paper-dim"></p>
+        <!-- Büyük video -->
+        <div class="min-w-0 flex-1">
+          <div class="overflow-hidden rounded-lg border border-ink-2 bg-black">
+            <video id="main-video" class="aspect-video h-full w-full" controls playsinline preload="metadata"></video>
+          </div>
         </div>
-        <button
-          id="modal-close"
-          class="rounded-full border border-ink-2 p-2 text-paper-dim transition-colors hover:border-amber hover:text-amber"
-          aria-label="Kapat"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+
+        <!-- Sağ mini önizleme + sağ yön -->
+        <button id="next-preview" type="button"
+          class="group hidden w-32 shrink-0 overflow-hidden rounded-lg border border-ink-2 bg-ink-2 text-left transition-colors hover:border-amber/60 sm:block md:w-40"
+          aria-label="Sonraki videoya git">
+          <span class="relative block aspect-[4/3] overflow-hidden">
+            <video id="next-video" class="h-full w-full object-cover" muted playsinline preload="metadata"></video>
+            <span class="absolute inset-0 flex items-center justify-center bg-ink/30">
+              <span class="flex h-9 w-9 items-center justify-center rounded-full border border-paper/60 bg-ink/70 text-sm text-paper">▶</span>
+            </span>
+          </span>
+          <span id="next-title" class="block truncate px-2 py-1.5 text-xs text-paper-dim"></span>
+        </button>
+
+        <button id="next-btn" type="button" aria-label="Sonraki video"
+          class="shrink-0 rounded-full p-2 text-3xl leading-none text-paper-dim transition-colors hover:text-amber sm:p-3">›</button>
+      </div>
+
+      <!-- Mobil mini önizlemeler (sm altı) -->
+      <div class="mt-3 grid grid-cols-2 gap-3 sm:hidden">
+        <button id="prev-preview-m" type="button" class="overflow-hidden rounded-lg border border-ink-2 bg-ink-2 text-left" aria-label="Önceki videoya git">
+          <span class="block truncate px-2 py-1.5 text-xs text-paper-dim">‹ Önceki</span>
+        </button>
+        <button id="next-preview-m" type="button" class="overflow-hidden rounded-lg border border-ink-2 bg-ink-2 text-left" aria-label="Sonraki videoya git">
+          <span class="block truncate px-2 py-1.5 text-right text-xs text-paper-dim">Sonraki ›</span>
         </button>
       </div>
-      <div class="relative aspect-video overflow-hidden rounded-lg border border-ink-2">
-        <video id="modal-video" class="h-full w-full bg-black" controls playsinline></video>
+
+      <!-- Video bilgisi -->
+      <div class="mt-4 rounded-lg border border-ink-2 bg-ink-2/60 p-4 sm:p-5">
+        <p id="main-cat" class="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber"></p>
+        <h1 id="main-title" class="mt-1 font-display text-2xl font-semibold leading-tight sm:text-3xl"></h1>
+        <p id="main-meta" class="mt-1 text-sm text-paper-dim"></p>
+        <p id="main-synopsis" class="mt-3 max-w-2xl text-sm leading-relaxed text-paper-dim"></p>
       </div>
-      <p id="modal-synopsis" class="mt-4 max-w-2xl text-sm leading-relaxed text-paper-dim"></p>
-    </div>
+    </main>
   </div>
+
+  <footer class="border-t border-ink-2">
+    <div class="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-xs text-paper-dim sm:flex-row sm:items-center sm:justify-between md:px-6">
+      <p>© 2026 Sinema Koleksiyonu — tüm filmler açık lisanslıdır.</p>
+      <p>← → tuşlarıyla da gezinebilirsin.</p>
+    </div>
+  </footer>
 `;
 
 /* ---------------------------------------------------------------
-   Filtre çubuğu
+   Durum + seçim mantığı
 ---------------------------------------------------------------- */
-const filtersEl = document.querySelector<HTMLDivElement>("#filters")!;
-let activeFilter: string = "Tümü";
 
-function renderFilters(): void {
-  filtersEl.innerHTML = "";
+let activeFolder: string = "Tümü";
+let currentIndex = 0;
+
+function filteredFilms(): Film[] {
+  return activeFolder === "Tümü"
+    ? FILMS
+    : FILMS.filter((f) => f.category === activeFolder);
+}
+
+function currentFilm(): Film {
+  const list = filteredFilms();
+  if (list.length === 0) return FILMS[0];
+  return list[((currentIndex % list.length) + list.length) % list.length];
+}
+
+function prevFilm(): Film {
+  const list = filteredFilms();
+  return list[((currentIndex - 1) % list.length + list.length) % list.length];
+}
+
+function nextFilm(): Film {
+  const list = filteredFilms();
+  return list[(currentIndex + 1) % list.length];
+}
+
+const folderListEl = document.querySelector<HTMLDivElement>("#folder-list")!;
+const videoListEl = document.querySelector<HTMLDivElement>("#video-list")!;
+const videoCountEl = document.querySelector<HTMLParagraphElement>("#video-count")!;
+const mainVideo = document.querySelector<HTMLVideoElement>("#main-video")!;
+const mainCat = document.querySelector<HTMLParagraphElement>("#main-cat")!;
+const mainTitle = document.querySelector<HTMLHeadingElement>("#main-title")!;
+const mainMeta = document.querySelector<HTMLParagraphElement>("#main-meta")!;
+const mainSynopsis = document.querySelector<HTMLParagraphElement>("#main-synopsis")!;
+const prevVideo = document.querySelector<HTMLVideoElement>("#prev-video")!;
+const nextVideo = document.querySelector<HTMLVideoElement>("#next-video")!;
+const prevTitle = document.querySelector<HTMLSpanElement>("#prev-title")!;
+const nextTitle = document.querySelector<HTMLSpanElement>("#next-title")!;
+
+function folderCount(cat: string): number {
+  return cat === "Tümü" ? FILMS.length : FILMS.filter((f) => f.category === cat).length;
+}
+
+function renderFolders(): void {
+  folderListEl.innerHTML = "";
   for (const cat of CATEGORIES) {
-    const active = cat === activeFilter;
+    const active = cat === activeFolder;
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = cat;
     btn.setAttribute("aria-pressed", String(active));
     btn.className = [
-      "shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+      "flex shrink-0 items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm transition-colors lg:w-full",
       active
-        ? "border-amber bg-amber text-ink"
+        ? "border-amber bg-amber text-ink font-semibold"
         : "border-ink-2 text-paper-dim hover:border-paper-dim hover:text-paper",
     ].join(" ");
+    btn.innerHTML = `
+      <span class="flex items-center gap-2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        </svg>
+        ${cat}
+      </span>
+      <span class="text-xs opacity-70">${folderCount(cat)}</span>
+    `;
     btn.addEventListener("click", () => {
-      activeFilter = cat;
-      renderFilters();
-      renderGrid();
+      activeFolder = cat;
+      currentIndex = 0;
+      renderAll();
     });
-    filtersEl.appendChild(btn);
+    folderListEl.appendChild(btn);
   }
 }
 
-/* ---------------------------------------------------------------
-   Grid — featured kartlar 2 kolon, gerisi normal akış
----------------------------------------------------------------- */
-const gridEl = document.querySelector<HTMLElement>("#grid")!;
-
-function filmCard(f: Film): HTMLElement {
-  const article = document.createElement("article");
-  article.className =
-    "group relative cursor-pointer overflow-hidden rounded-lg border border-ink-2 bg-ink-2 transition-colors hover:border-amber/60";
-  if (f.featured) article.classList.add("sm:col-span-2");
-
-  article.innerHTML = `
-    <div class="${f.featured ? "aspect-video" : "aspect-[4/3]"} overflow-hidden">
-      <video
-        class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        src="${f.video}"
-        poster="${f.poster}"
-        muted
-        loop
-        playsinline
-        preload="metadata"
-      ></video>
-    </div>
-    <div class="pointer-events-none absolute inset-0 flex items-end bg-gradient-to-t from-ink/85 via-ink/20 to-transparent p-5 opacity-90 transition-opacity group-hover:opacity-100">
-      <div>
-        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber">
-          ${f.category} · ${f.year}
-        </p>
-        <h3 class="mt-1 font-display text-xl font-semibold leading-tight">
-          ${f.title}
-        </h3>
-        <p class="mt-1 text-sm text-paper-dim">
-          ${f.director} · ${f.runtime}
-        </p>
-      </div>
-    </div>
-  `;
-
-  const vid = article.querySelector("video")!;
-
-  // Hover'da sessiz önizleme
-  article.addEventListener("mouseenter", () => {
-    vid.play().catch(() => {
-      /* otomatik oynatma engellenirse sessizce geç */
+function renderVideoList(): void {
+  videoListEl.innerHTML = "";
+  const list = filteredFilms();
+  list.forEach((f, i) => {
+    const active = i === currentIndex;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("role", "option");
+    btn.setAttribute("aria-selected", String(active));
+    btn.className = [
+      "flex shrink-0 items-center gap-2 rounded-md border p-1.5 pr-3 text-left text-sm transition-colors lg:w-full",
+      active
+        ? "border-amber bg-amber/10 text-paper"
+        : "border-transparent text-paper-dim hover:border-ink-2 hover:text-paper",
+    ].join(" ");
+    btn.innerHTML = `
+      <img src="${f.poster}" alt="" class="h-9 w-14 shrink-0 rounded object-cover" loading="lazy" />
+      <span class="min-w-0">
+        <span class="block truncate font-medium">${f.title}</span>
+        <span class="block truncate text-xs opacity-70">${f.director} · ${f.year}</span>
+      </span>
+    `;
+    btn.addEventListener("click", () => {
+      currentIndex = i;
+      renderAll();
     });
+    videoListEl.appendChild(btn);
   });
-  article.addEventListener("mouseleave", () => {
-    vid.pause();
-    vid.currentTime = 0;
-  });
-
-  // Modal aç
-  article.addEventListener("click", () => openModal(f));
-  article.setAttribute("tabindex", "0");
-  article.setAttribute("role", "button");
-  article.setAttribute("aria-label", `${f.title} — oynat`);
-  article.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openModal(f);
-    }
-  });
-
-  return article;
 }
 
-function renderGrid(): void {
-  gridEl.innerHTML = "";
-  const list =
-    activeFilter === "Tümü"
-      ? FILMS
-      : FILMS.filter((f) => f.category === activeFilter);
-  for (const f of list) gridEl.appendChild(filmCard(f));
+function renderStage(): void {
+  const list = filteredFilms();
+  const cur = currentFilm();
+  const prev = prevFilm();
+  const next = nextFilm();
+
+  videoCountEl.textContent = `Küratörlü arşiv · ${list.length} film`;
+
+  mainCat.textContent = `${cur.category} · ${cur.year}`;
+  mainTitle.textContent = cur.title;
+  mainMeta.textContent = `${cur.director} · ${cur.runtime}`;
+  mainSynopsis.textContent = cur.synopsis;
+
+  if (mainVideo.getAttribute("src") !== cur.video) {
+    mainVideo.pause();
+    mainVideo.src = cur.video;
+    mainVideo.poster = cur.poster;
+    mainVideo.load();
+  }
+
+  prevVideo.src = prev.video;
+  prevVideo.poster = prev.poster;
+  prevTitle.textContent = prev.title;
+
+  nextVideo.src = next.video;
+  nextVideo.poster = next.poster;
+  nextTitle.textContent = next.title;
+
+  document
+    .querySelector<HTMLButtonElement>("#prev-preview")!
+    .setAttribute("aria-label", `Önceki video: ${prev.title}`);
+  document
+    .querySelector<HTMLButtonElement>("#next-preview")!
+    .setAttribute("aria-label", `Sonraki video: ${next.title}`);
 }
 
-/* ---------------------------------------------------------------
-   Modal
----------------------------------------------------------------- */
-const modal = document.querySelector<HTMLDivElement>("#modal")!;
-const modalVideo = document.querySelector<HTMLVideoElement>("#modal-video")!;
-const modalTitle = document.querySelector<HTMLHeadingElement>("#modal-title")!;
-const modalMeta = document.querySelector<HTMLParagraphElement>("#modal-meta")!;
-const modalSynopsis =
-  document.querySelector<HTMLParagraphElement>("#modal-synopsis")!;
-
-function openModal(f: Film): void {
-  modalTitle.textContent = f.title;
-  modalMeta.textContent = `${f.director} · ${f.year} · ${f.runtime} · ${f.category}`;
-  modalSynopsis.textContent = f.synopsis;
-  modalVideo.src = f.video;
-  modal.classList.remove("hidden");
-  modal.classList.add("flex");
-  modalVideo.play().catch(() => {});
-  document.body.style.overflow = "hidden";
+function renderAll(): void {
+  renderFolders();
+  renderVideoList();
+  renderStage();
 }
 
-function closeModal(): void {
-  modalVideo.pause();
-  modalVideo.removeAttribute("src");
-  modalVideo.load();
-  modal.classList.add("hidden");
-  modal.classList.remove("flex");
-  document.body.style.overflow = "";
+function goPrev(): void {
+  const list = filteredFilms();
+  currentIndex = ((currentIndex - 1) % list.length + list.length) % list.length;
+  renderAll();
 }
 
-document
-  .querySelector<HTMLButtonElement>("#modal-close")!
-  .addEventListener("click", closeModal);
+function goNext(): void {
+  const list = filteredFilms();
+  currentIndex = (currentIndex + 1) % list.length;
+  renderAll();
+}
 
-modal.addEventListener("click", (e) => {
-  if (e.target === modal) closeModal();
-});
+document.querySelector<HTMLButtonElement>("#prev-btn")!.addEventListener("click", goPrev);
+document.querySelector<HTMLButtonElement>("#next-btn")!.addEventListener("click", goNext);
+document.querySelector<HTMLButtonElement>("#prev-preview")!.addEventListener("click", goPrev);
+document.querySelector<HTMLButtonElement>("#next-preview")!.addEventListener("click", goNext);
+document.querySelector<HTMLButtonElement>("#prev-preview-m")!.addEventListener("click", goPrev);
+document.querySelector<HTMLButtonElement>("#next-preview-m")!.addEventListener("click", goNext);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
+  if (e.key === "ArrowLeft") goPrev();
+  if (e.key === "ArrowRight") goNext();
 });
 
 /* Başlat */
-// Modül scriptleri DOM ayrıştırıldıktan sonra çalışır → doğrudan çizim yeterli.
-renderFilters();
-renderGrid();
+renderAll();
