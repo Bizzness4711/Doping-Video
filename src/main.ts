@@ -142,6 +142,11 @@ function at(list: Film[], i: number): Film {
   return list[((i % list.length) + list.length) % list.length];
 }
 
+/* Videonun gerçek dosya adı (URL'deki ...mp4 kısmı) */
+function fileName(f: Film): string {
+  return f.video.substring(f.video.lastIndexOf("/") + 1);
+}
+
 const folderListEl = document.querySelector<HTMLDivElement>("#folder-list")!;
 const videoListEl = document.querySelector<HTMLDivElement>("#video-list")!;
 const mainVideo = document.querySelector<HTMLVideoElement>("#main-video")!;
@@ -176,7 +181,7 @@ function renderVideoList(): void {
   filteredFilms().forEach((f, i) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = f.title;
+    btn.textContent = fileName(f);
     btn.setAttribute("role", "option");
     btn.setAttribute("aria-selected", String(i === currentIndex));
     btn.className = [
@@ -203,12 +208,12 @@ function renderStage(): void {
     mainVideo.poster = cur.poster;
     mainVideo.load();
   }
-  mainTitle.textContent = cur.title;
+  mainTitle.textContent = fileName(cur);
 
   prevImg.src = prev.poster;
-  prevTitle.textContent = prev.title;
+  prevTitle.textContent = fileName(prev);
   nextImg.src = next.poster;
-  nextTitle.textContent = next.title;
+  nextTitle.textContent = fileName(next);
 }
 
 function renderAll(): void {
