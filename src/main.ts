@@ -372,7 +372,6 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* Başlat */
-document.addEventListener("DOMContentLoaded",) => {
-  renderFilters();
-  renderGrid();
-});
+// Modül scriptleri DOM ayrıştırıldıktan sonra çalışır → doğrudan çizim yeterli.
+renderFilters();
+renderGrid();
